@@ -1382,7 +1382,7 @@ namespace templates {
 
 char const* csv() noexcept {
     return R"DELIM("title";"name";"unit";"batch";"elapsed";"error %";"instructions";"branches";"branch misses";"total"
-{{#result}}"{{title}}";"{{name}}";"{{unit}}";{{batch}};{{median(elapsed)}};{{medianAbsolutePercentError(elapsed)}};{{median(instructions)}};{{median(branchinstructions)}};{{median(branchmisses)}};{{sumProduct(iterations, elapsed)}}
+{{#result}}"{{title}}";"{{name}}";"{{unit}}";{{batch}};{{median(elapsed)}};{{medianAbsolutePercentError(elapsed)}};{{median(instructions)}};{{median(branchinstructions)}};{{median(branchmisses)}};{{median(l1daccesses)}};{{median(l1dmisses)}};{{median(llcaccesses)}};{{median(llcmisses)}};{{sumProduct(iterations, elapsed)}}
 {{/result}})DELIM";
 }
 
@@ -1475,6 +1475,10 @@ char const* json() noexcept {
                     "instructions": {{instructions}},
                     "branchinstructions": {{branchinstructions}},
                     "branchmisses": {{branchmisses}}
+                    "l1daccesses": {{l1daccesses}},
+                    "l1dmisses": {{l1dmisses}}
+                    "llcaccesses": {{llcaccesses}},
+                    "llcmisses": {{llcmisses}}
                 }{{^-last}},{{/-last}}
 {{/measurement}}            ]
         }{{^-last}},{{/-last}}
