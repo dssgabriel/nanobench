@@ -2326,7 +2326,7 @@ struct IterationLogic::Impl {
                     if (rBraMedian >= 1e-9) {
                         p = 100.0 * mResult.median(Result::Measure::branchmisses) / rBraMedian;
                     }
-                    columns.emplace_back(10, 1, "miss%", "%", p);
+                    columns.emplace_back(13, 1, "bra miss%", "%", p);
                 }
             }
             if (mBench.performanceCounters() && mResult.has(Result::Measure::l1daccesses)) {
