@@ -378,6 +378,10 @@ struct PerfCountSet {
     T instructions{};
     T branchInstructions{};
     T branchMisses{};
+    T l1dAccesses{};
+    T l1dMisses{};
+    T llcAccesses{};
+    T llcMisses{};
 };
 
 } // namespace detail
@@ -427,6 +431,10 @@ public:
         instructions,
         branchinstructions,
         branchmisses,
+        l1daccesses,
+        l1dmisses,
+        llcaccesses,
+        llcmisses,
         _size
     };
 
@@ -2317,6 +2325,28 @@ struct IterationLogic::Impl {
                     columns.emplace_back(10, 1, "miss%", "%", p);
                 }
             }
+            if (mBench.performanceCounters() && mResult.has(Result::Measure::l1daccesses)) {
+                double const rL1dMedian = mResult.median(Result::Measure::l1daccesses);
+                columns.emplace_back(18, 2, "L1D$ ref/" + mBench.unit(), "", rL1dMedian / mBench.batch());
+                if (mResult.has(Result::Measure::l1dmisses)) {
+                    double p = 0.0;
+                    if (rL1dMedian >= 1e-9) {
+                        p = 100.0 * mResult.median(Result::Measure::l1dmisses) / rL1dMedian;
+                    }
+                    columns.emplace_back(13, 2, "L1D$ miss%", "%", p);
+                }
+            }
+            if (mBench.performanceCounters() && mResult.has(Result::Measure::llcaccesses)) {
+                double const rLlcMedian = mResult.median(Result::Measure::llcaccesses);
+                columns.emplace_back(18, 2, "LL$ ref/" + mBench.unit(), "", rLlcMedian / mBench.batch());
+                if (mResult.has(Result::Measure::llcmisses)) {
+                    double p = 0.0;
+                    if (rLlcMedian >= 1e-9) {
+                        p = 100.0 * mResult.median(Result::Measure::llcmisses) / rLlcMedian;
+                    }
+                    columns.emplace_back(13, 2, "LL$ miss%", "%", p);
+                }
+            }
 
             columns.emplace_back(12, 2, "total", "", mResult.sumProduct(Result::Measure::iterations, Result::Measure::elapsed));
 
@@ -2441,6 +2471,7 @@ public:
 
     bool monitor(perf_sw_ids swId, Target target);
     bool monitor(perf_hw_id hwId, Target target);
+    bool monitor(uint32_t type, uint64_t eventid, Target target);
 
     ANKERL_NANOBENCH(NODISCARD) bool hasError() const noexcept {
         return mHasError;
@@ -2566,8 +2597,6 @@ public:
     }
 
 private:
-    bool monitor(uint32_t type, uint64_t eventid, Target target);
-
     std::map<uint64_t, Target> mIdToTarget{};
 
     // start with minimum size of 3 for read_format
@@ -2709,6 +2738,22 @@ PerformanceCounters::PerformanceCounters()
         mPc->monitor(PERF_COUNT_HW_BRANCH_INSTRUCTIONS, LinuxPerformanceCounters::Target(&mVal.branchInstructions, true, false));
     mHas.branchMisses = mPc->monitor(PERF_COUNT_HW_BRANCH_MISSES, LinuxPerformanceCounters::Target(&mVal.branchMisses, true, false));
     // mHas.branchMisses = false;
+    mHas.l1dAccesses = mPc->monitor(
+        PERF_TYPE_HW_CACHE,
+        uint64_t(PERF_COUNT_HW_CACHE_L1D) | (uint64_t(PERF_COUNT_HW_CACHE_OP_READ) << 8) | (uint64_t(PERF_COUNT_HW_CACHE_RESULT_ACCESS) << 16),
+        LinuxPerformanceCounters::Target(&mVal.l1dAccesses, true, false));
+    mHas.l1dMisses = mPc->monitor(
+        PERF_TYPE_HW_CACHE,
+        uint64_t(PERF_COUNT_HW_CACHE_L1D) | (uint64_t(PERF_COUNT_HW_CACHE_OP_READ) << 8) | (uint64_t(PERF_COUNT_HW_CACHE_RESULT_MISS) << 16),
+        LinuxPerformanceCounters::Target(&mVal.l1dMisses, true, false));
+    mHas.llcAccesses = mPc->monitor(
+        PERF_TYPE_HW_CACHE,
+        uint64_t(PERF_COUNT_HW_CACHE_LL) | (uint64_t(PERF_COUNT_HW_CACHE_OP_READ) << 8) | (uint64_t(PERF_COUNT_HW_CACHE_RESULT_ACCESS) << 16),
+        LinuxPerformanceCounters::Target(&mVal.llcAccesses, true, false));
+    mHas.llcMisses = mPc->monitor(
+        PERF_TYPE_HW_CACHE,
+        uint64_t(PERF_COUNT_HW_CACHE_LL) | (uint64_t(PERF_COUNT_HW_CACHE_OP_READ) << 8) | (uint64_t(PERF_COUNT_HW_CACHE_RESULT_MISS) << 16),
+        LinuxPerformanceCounters::Target(&mVal.llcMisses, true, false));
 
     // SW events
     mHas.pageFaults = mPc->monitor(PERF_COUNT_SW_PAGE_FAULTS, LinuxPerformanceCounters::Target(&mVal.pageFaults, true, false));
@@ -2965,6 +3010,32 @@ void Result::add(Clock::duration totalElapsed, uint64_t iters, detail::Performan
             mNameToMeasurements[u(Result::Measure::branchmisses)].push_back(branchMisses / dIters);
         }
     }
+    if (pc.has().l1dAccesses) {
+        double l1dAccesses = d(pc.val().l1dAccesses);
+        mNameToMeasurements[u(Result::Measure::l1daccesses)].push_back(l1dAccesses / dIters);
+
+        if (pc.has().l1dMisses) {
+            double l1dMisses = d(pc.val().l1dMisses);
+            if (l1dMisses > l1dAccesses) {
+                // can't have more L1D$ misses than there were accesses...
+                l1dMisses = l1dAccesses;
+            }
+            mNameToMeasurements[u(Result::Measure::l1dmisses)].push_back(l1dMisses / dIters);
+        }
+    }
+    if (pc.has().llcAccesses) {
+        double llcAccesses = d(pc.val().llcAccesses);
+        mNameToMeasurements[u(Result::Measure::llcaccesses)].push_back(llcAccesses / dIters);
+
+        if (pc.has().llcMisses) {
+            double llcMisses = d(pc.val().llcMisses);
+            if (llcMisses > llcAccesses) {
+                // can't have more LL$ misses than there were accesses...
+                llcMisses = llcAccesses;
+            }
+            mNameToMeasurements[u(Result::Measure::llcmisses)].push_back(llcMisses / dIters);
+        }
+    }
 }
 
 Config const& Result::config() const noexcept {
@@ -3109,6 +3180,18 @@ Result::Measure Result::fromString(std::string const& str) {
     }
     if (str == "branchmisses") {
         return Measure::branchmisses;
+    }
+    if (str == "l1daccesses") {
+        return Measure::l1daccesses;
+    }
+    if (str == "l1dmisses") {
+        return Measure::l1dmisses;
+    }
+    if (str == "llcaccesses") {
+        return Measure::llcaccesses;
+    }
+    if (str == "llcmisses") {
+        return Measure::llcmisses;
     }
     // not found, return _size
     return Measure::_size;
