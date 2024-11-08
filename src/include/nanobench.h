@@ -1464,6 +1464,10 @@ char const* json() noexcept {
             "median(pagefaults)": {{median(pagefaults)}},
             "median(branchinstructions)": {{median(branchinstructions)}},
             "median(branchmisses)": {{median(branchmisses)}},
+            "median(l1daccesses)": {{median(l1daccesses)}},
+            "median(l1dmisses)": {{median(l1dmisses)}},
+            "median(llcaccesses)": {{median(llcaccesses)}},
+            "median(llcmisses)": {{median(llcmisses)}},
             "totalTime": {{sumProduct(iterations, elapsed)}},
             "measurements": [
 {{#measurement}}                {
