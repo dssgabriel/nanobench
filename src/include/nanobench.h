@@ -1478,9 +1478,9 @@ char const* json() noexcept {
                     "contextswitches": {{contextswitches}},
                     "instructions": {{instructions}},
                     "branchinstructions": {{branchinstructions}},
-                    "branchmisses": {{branchmisses}}
+                    "branchmisses": {{branchmisses}},
                     "l1daccesses": {{l1daccesses}},
-                    "l1dmisses": {{l1dmisses}}
+                    "l1dmisses": {{l1dmisses}},
                     "llcaccesses": {{llcaccesses}},
                     "llcmisses": {{llcmisses}}
                 }{{^-last}},{{/-last}}
