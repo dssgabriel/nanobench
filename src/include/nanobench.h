@@ -129,8 +129,8 @@
 namespace ankerl {
 namespace nanobench {
 
-using Clock = std::conditional<std::chrono::high_resolution_clock::is_steady, std::chrono::high_resolution_clock,
-                               std::chrono::steady_clock>::type;
+using Clock = std::conditional_t<std::chrono::high_resolution_clock::is_steady, std::chrono::high_resolution_clock,
+                                 std::chrono::steady_clock>;
 class Bench;
 struct Config;
 class Result;
@@ -409,7 +409,7 @@ struct Config {
     std::string mTimeUnitName = "ns";                                      // NOLINT(misc-non-private-member-variables-in-classes)
     bool mShowPerformanceCounters = true;                                  // NOLINT(misc-non-private-member-variables-in-classes)
     bool mIsRelative = false;                                              // NOLINT(misc-non-private-member-variables-in-classes)
-    std::unordered_map<std::string, std::string> mContext{};               // NOLINT(misc-non-private-member-variables-in-classes)
+    std::unordered_map<std::string, std::string> mContext;                 // NOLINT(misc-non-private-member-variables-in-classes)
 
     Config();
     ~Config();
@@ -475,8 +475,8 @@ public:
     static Measure fromString(std::string const& str);
 
 private:
-    Config mConfig{};
-    std::vector<std::vector<double>> mNameToMeasurements{};
+    Config mConfig;
+    std::vector<std::vector<double>> mNameToMeasurements;
 };
 ANKERL_NANOBENCH(IGNORE_PADDED_POP)
 
@@ -1020,8 +1020,8 @@ public:
     ANKERL_NANOBENCH(NODISCARD) Config const& config() const noexcept;
 
 private:
-    Config mConfig{};
-    std::vector<Result> mResults{};
+    Config mConfig;
+    std::vector<Result> mResults;
 };
 ANKERL_NANOBENCH(IGNORE_PADDED_POP)
 
@@ -1150,9 +1150,9 @@ public:
     ANKERL_NANOBENCH(NODISCARD) bool operator<(BigO const& other) const noexcept;
 
 private:
-    std::string mName{};
-    double mConstant{};
-    double mNormalizedRootMeanSquare{};
+    std::string mName;
+    double mConstant;
+    double mNormalizedRootMeanSquare;
 };
 std::ostream& operator<<(std::ostream& os, BigO const& bigO);
 std::ostream& operator<<(std::ostream& os, std::vector<ankerl::nanobench::BigO> const& bigOs);
