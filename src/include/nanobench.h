@@ -378,8 +378,6 @@ struct PerfCountSet {
     T instructions{};
     T branchInstructions{};
     T branchMisses{};
-    T l1iAccesses{};
-    T l1iMisses{};
     T l1dAccesses{};
     T l1dMisses{};
     T llcAccesses{};
@@ -433,8 +431,6 @@ public:
         instructions,
         branchinstructions,
         branchmisses,
-        l1iaccesses,
-        l1imisses,
         l1daccesses,
         l1dmisses,
         llcaccesses,
@@ -1385,8 +1381,8 @@ inline Clock::duration clockResolution() noexcept;
 namespace templates {
 
 char const* csv() noexcept {
-    return R"DELIM(title,name,unit,batch,elapsed,error %,instructions,branches,branch misses,L1I refs,L1I misses,L1D refs,L1D misses,LLC refs,LLC misses,total
-{{#result}}{{title}},{{name}},{{unit}},{{batch}},{{median(elapsed)}},{{medianAbsolutePercentError(elapsed)}},{{median(instructions)}},{{median(branchinstructions)}},{{median(branchmisses)}},{{median(l1iaccesses)}},{{median(l1imisses)}},{{median(l1daccesses)}},{{median(l1dmisses)}},{{median(llcaccesses)}},{{median(llcmisses)}},{{sumProduct(iterations, elapsed)}}
+    return R"DELIM(title,name,unit,batch,elapsed,error %,instructions,branches,branch misses,L1D refs,L1D misses,LLC refs,LLC misses,total
+{{#result}}{{title}},{{name}},{{unit}},{{batch}},{{median(elapsed)}},{{medianAbsolutePercentError(elapsed)}},{{median(instructions)}},{{median(branchinstructions)}},{{median(branchmisses)}},{{median(l1daccesses)}},{{median(l1dmisses)}},{{median(llcaccesses)}},{{median(llcmisses)}},{{sumProduct(iterations, elapsed)}}
 {{/result}})DELIM";
 }
 
@@ -1468,8 +1464,6 @@ char const* json() noexcept {
             "median(pagefaults)": {{median(pagefaults)}},
             "median(branchinstructions)": {{median(branchinstructions)}},
             "median(branchmisses)": {{median(branchmisses)}},
-            "median(l1iaccesses)": {{median(l1iaccesses)}},
-            "median(l1imisses)": {{median(l1imisses)}},
             "median(l1daccesses)": {{median(l1daccesses)}},
             "median(l1dmisses)": {{median(l1dmisses)}},
             "median(llcaccesses)": {{median(llcaccesses)}},
@@ -1485,8 +1479,6 @@ char const* json() noexcept {
                     "instructions": {{instructions}},
                     "branchinstructions": {{branchinstructions}},
                     "branchmisses": {{branchmisses}},
-                    "l1iaccesses": {{l1iaccesses}},
-                    "l1imisses": {{l1imisses}},
                     "l1daccesses": {{l1daccesses}},
                     "l1dmisses": {{l1dmisses}},
                     "llcaccesses": {{llcaccesses}},
@@ -2341,17 +2333,6 @@ struct IterationLogic::Impl {
                     columns.emplace_back(13, 1, "bra miss%", "%", p);
                 }
             }
-            if (mBench.performanceCounters() && mResult.has(Result::Measure::l1iaccesses)) {
-                double const rL1iMedian = mResult.median(Result::Measure::l1iaccesses);
-                columns.emplace_back(18, 2, "L1I$ ref/" + mBench.unit(), "", rL1iMedian / mBench.batch());
-                if (mResult.has(Result::Measure::l1imisses)) {
-                    double p = 0.0;
-                    if (rL1iMedian >= 1e-9) {
-                        p = 100.0 * mResult.median(Result::Measure::l1imisses) / rL1iMedian;
-                    }
-                    columns.emplace_back(13, 2, "L1I$ miss%", "%", p);
-                }
-            }
             if (mBench.performanceCounters() && mResult.has(Result::Measure::l1daccesses)) {
                 double const rL1dMedian = mResult.median(Result::Measure::l1daccesses);
                 columns.emplace_back(18, 2, "L1D$ ref/" + mBench.unit(), "", rL1dMedian / mBench.batch());
@@ -2765,14 +2746,6 @@ PerformanceCounters::PerformanceCounters()
         mPc->monitor(PERF_COUNT_HW_BRANCH_INSTRUCTIONS, LinuxPerformanceCounters::Target(&mVal.branchInstructions, true, false));
     mHas.branchMisses = mPc->monitor(PERF_COUNT_HW_BRANCH_MISSES, LinuxPerformanceCounters::Target(&mVal.branchMisses, true, false));
     // mHas.branchMisses = false;
-    mHas.l1iAccesses = mPc->monitor(
-        PERF_TYPE_HW_CACHE,
-        uint64_t(PERF_COUNT_HW_CACHE_L1I) | (uint64_t(PERF_COUNT_HW_CACHE_OP_READ) << 8) | (uint64_t(PERF_COUNT_HW_CACHE_RESULT_ACCESS) << 16),
-        LinuxPerformanceCounters::Target(&mVal.l1iAccesses, true, false));
-    mHas.l1iMisses = mPc->monitor(
-        PERF_TYPE_HW_CACHE,
-        uint64_t(PERF_COUNT_HW_CACHE_L1I) | (uint64_t(PERF_COUNT_HW_CACHE_OP_READ) << 8) | (uint64_t(PERF_COUNT_HW_CACHE_RESULT_MISS) << 16),
-        LinuxPerformanceCounters::Target(&mVal.l1iMisses, true, false));
     mHas.l1dAccesses = mPc->monitor(
         PERF_TYPE_HW_CACHE,
         uint64_t(PERF_COUNT_HW_CACHE_L1D) | (uint64_t(PERF_COUNT_HW_CACHE_OP_READ) << 8) | (uint64_t(PERF_COUNT_HW_CACHE_RESULT_ACCESS) << 16),
@@ -3045,19 +3018,6 @@ void Result::add(Clock::duration totalElapsed, uint64_t iters, detail::Performan
             mNameToMeasurements[u(Result::Measure::branchmisses)].push_back(branchMisses / dIters);
         }
     }
-    if (pc.has().l1iAccesses) {
-        double l1iAccesses = d(pc.val().l1iAccesses);
-        mNameToMeasurements[u(Result::Measure::l1iaccesses)].push_back(l1iAccesses / dIters);
-
-        if (pc.has().l1iMisses) {
-            double l1iMisses = d(pc.val().l1iMisses);
-            if (l1iMisses > l1iAccesses) {
-                // can't have more L1I$ misses than there were accesses...
-                l1iMisses = l1iAccesses;
-            }
-            mNameToMeasurements[u(Result::Measure::l1imisses)].push_back(l1iMisses / dIters);
-        }
-    }
     if (pc.has().l1dAccesses) {
         double l1dAccesses = d(pc.val().l1dAccesses);
         mNameToMeasurements[u(Result::Measure::l1daccesses)].push_back(l1dAccesses / dIters);
@@ -3228,12 +3188,6 @@ Result::Measure Result::fromString(std::string const& str) {
     }
     if (str == "branchmisses") {
         return Measure::branchmisses;
-    }
-    if (str == "l1iaccesses") {
-        return Measure::l1iaccesses;
-    }
-    if (str == "l1imisses") {
-        return Measure::l1imisses;
     }
     if (str == "l1daccesses") {
         return Measure::l1daccesses;
